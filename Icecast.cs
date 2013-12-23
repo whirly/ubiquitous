@@ -6,27 +6,58 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+using NAudio.Utils;
+using NAudio.Wave;
+
 namespace Ubiquitous
 {
     class Icecast
     {
         private HttpWebRequest outReq;
+        private HttpWebRequest inReq;
+
+        private WaveInEvent capture;
+        private WaveOutEvent output;
+
+        private BufferedWaveProvider buffer;
+
         public Icecast( String server, String inPoint, String outPoint, String password )
         {
-            outReq = InitializeOutStream( server, outPoint, password );            
+            outReq = InitializeOutStream( server, outPoint, password );
+            
+            capture = InitializeCapture();
+            output = InitializeOutput();
         }
 
         public void Stream( )
         {
-            Stream outStream = outReq.GetRequestStream();
-
-            byte[]  buffer = new byte[ 1024 ];
+            capture.StartRecording();
+            output.Play();
 
             while( true ) 
             {
-                outStream.Write(buffer, 0, 1024);
             }
 
+        }
+
+        private WaveInEvent InitializeCapture()
+        {
+            WaveInEvent capture = new WaveInEvent();
+            capture.WaveFormat = new WaveFormat(44100, 2);
+            capture.BufferMilliseconds = 500;
+            capture.DataAvailable += new EventHandler<WaveInEventArgs>(SendCaptureSample);
+
+            return capture;
+        }
+
+        private WaveOutEvent InitializeOutput()
+        {
+            WaveOutEvent output = new WaveOutEvent();
+            buffer = new BufferedWaveProvider(capture.WaveFormat);
+
+            output.Init(buffer);
+
+            return output;
         }
 
         private HttpWebRequest InitializeOutStream( String server, String outPoint, String password )
@@ -54,6 +85,12 @@ namespace Ubiquitous
             Console.Write(" OK\n");
 
             return client;
+        }
+
+        private void SendCaptureSample( object sender, WaveInEventArgs e )
+        {
+            Console.WriteLine("Byte recorded : {0}", e.BytesRecorded);
+            buffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
         }
     }
 }
