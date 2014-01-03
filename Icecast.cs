@@ -13,26 +13,32 @@ namespace Ubiquitous
 {
     class Icecast
     {
-        private HttpWebRequest outReq;
         private HttpWebRequest inReq;
 
         private WaveInEvent capture;
         private WaveOutEvent output;
 
         private BufferedWaveProvider buffer;
+        private Stream outputStream;
+
+        VorbisEncoder encoder = new VorbisEncoder(2, 44100, 0.6F);
+        private Stream fileStream;
 
         public Icecast( String server, String inPoint, String outPoint, String password )
         {
-            outReq = InitializeOutStream( server, outPoint, password );
+            outputStream = InitializeOutStream( server, outPoint, password );
+            fileStream = File.Open("machin.ogg", FileMode.Create);
             
             capture = InitializeCapture();
-            output = InitializeOutput();
+            // output = InitializeOutput();
         }
 
         public void Stream( )
         {
+            encoder.WriteHeader(fileStream);
+
             capture.StartRecording();
-            output.Play();
+            // output.Play();
 
             while( true ) 
             {
@@ -44,7 +50,7 @@ namespace Ubiquitous
         {
             WaveInEvent capture = new WaveInEvent();
             capture.WaveFormat = new WaveFormat(44100, 2);
-            capture.BufferMilliseconds = 500;
+            capture.BufferMilliseconds = 1000;
             capture.DataAvailable += new EventHandler<WaveInEventArgs>(SendCaptureSample);
 
             return capture;
@@ -60,9 +66,8 @@ namespace Ubiquitous
             return output;
         }
 
-        private HttpWebRequest InitializeOutStream( String server, String outPoint, String password )
-        {
-            
+        private Stream InitializeOutStream( String server, String outPoint, String password )
+        {           
             String outURL = "http://" + server + "/" + outPoint + ".ogg";
             HttpWebRequest client = (HttpWebRequest) WebRequest.Create( outURL );
 
@@ -81,16 +86,22 @@ namespace Ubiquitous
             client.Headers.Add("ice-private", "0");
 
             Console.Write("Connect to end point " + outURL );
-            WebResponse response = client.GetResponse();
-            Console.Write(" OK\n");
 
-            return client;
+            client.SendChunked = true;
+            client.KeepAlive = true;
+
+            Stream output = client.GetRequestStream();
+            
+            //WebResponse response = client.GetResponse();
+            Console.Write(" OK\n");
+            
+            return output;
         }
 
         private void SendCaptureSample( object sender, WaveInEventArgs e )
         {
             Console.WriteLine("Byte recorded : {0}", e.BytesRecorded);
-            buffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
+            encoder.WriteAudio(fileStream, e.Buffer, e.BytesRecorded);
         }
     }
 }
