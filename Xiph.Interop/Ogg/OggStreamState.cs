@@ -63,8 +63,7 @@ namespace Xiph.Interop.Ogg
 		/// <summary>
 		/// working space for header encode
 		/// </summary>
-		[MarshalAs(UnmanagedType.ByValArray, SizeConst=282)]
-		internal byte[]		header;
+		internal IntPtr		header;
 		internal int		header_fill;
 		/// <summary>
 		/// set when we have buffered the last packet in the logical bitstream
@@ -241,6 +240,7 @@ namespace Xiph.Interop.Ogg
 			if(og == null)
 				throw new ArgumentException("OggPage og cannot be null!");
 			int retval = ogg_stream_flush(ref os.ogg_stream_state, ref og.ogg_page);
+
 			os.changed = true;
 			og.changed = true;
 			return retval;
